@@ -131,11 +131,18 @@ app
     };
   }
 ])
-.controller('UserIndexController', ['$scope', '$state', 'userApi', 'markdownDialog',
-  ($scope, $state, userApi, markdownDialog) => {
+.controller('UserIndexController', ['$scope', '$state', 'userApi', 'markdownDialog', '$sessionStorage', 'autopopDialog',
+  ($scope, $state, userApi, markdownDialog, $sessionStorage, autopopDialog) => {
     $scope.setTitle('首页');
     userApi.getNotice().then(success => {
       $scope.notices = success;
+      if(!$sessionStorage.showNotice) {
+        $sessionStorage.showNotice = true;
+        const autopopNotice = $scope.notices.filter(notice => notice.autopop);
+        if(autopopNotice.length) {
+          autopopDialog.show(autopopNotice);
+        }
+      }
     });
     $scope.toMyAccount = () => {
       $state.go('user.account');
@@ -353,6 +360,9 @@ app
     $scope.toRef = () => {
       $state.go('user.ref');
     };
+    $scope.toMac = () => {
+      $state.go('user.macAddress');
+    };
   }
 ])
 .controller('UserChangePasswordController', ['$scope', '$state', 'userApi', 'alertDialog', '$http', '$localStorage',
@@ -421,6 +431,29 @@ app
     $http.get('/api/user/order').then(success => {
       $scope.orders = success.data;
     });
+  }
+])
+.controller('UserMacAddressController', ['$scope', '$state', '$http', 'addMacAccountDialog',
+  ($scope, $state, $http, addMacAccountDialog) => {
+    $scope.setTitle('MAC地址');
+    $scope.setMenuButton('arrow_back', 'user.settings');
+    const getMacAccount = () => {
+      $http.get('/api/user/account/mac').then(success => {
+        $scope.macAccounts = success.data;
+        if(!$scope.macAccounts.length) {
+          $scope.setFabButton(() => {
+            addMacAccountDialog.show().then(() => {
+              getMacAccount();
+            }).catch(err => {
+              getMacAccount();
+            });
+          });
+        } else {
+          $scope.setFabButton();
+        }
+      });
+    };
+    getMacAccount();
   }
 ])
 ;

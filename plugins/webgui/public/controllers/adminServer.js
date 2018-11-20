@@ -173,6 +173,9 @@ app.controller('AdminServerController', ['$scope', '$http', '$state', 'moment', 
             $scope.currentPorts[account.port + $scope.server.shift].id = account.id;
           }
         });
+        $scope.portNumber = Object.keys($scope.currentPorts).filter(f => {
+          return $scope.currentPorts[f].exists;
+        }).length;
       });
     };
     getServerInfo();
@@ -228,7 +231,7 @@ app.controller('AdminServerController', ['$scope', '$http', '$state', 'moment', 
     };
     const setChart = (lineData, pieData) => {
       const pieDataSort = pieData.sort((a, b) => {
-        return a.flow >= b.flow;
+        return a.flow - b.flow;
       });
       $scope.pieChart = {
         data: pieDataSort.map(m => m.flow),
@@ -316,22 +319,22 @@ app.controller('AdminServerController', ['$scope', '$http', '$state', 'moment', 
       if($mdMedia('xs')) {
         return {
           line: [ 320, 170 ],
-          pie: [ 170, 170 ],
+          pie: [ 180, 170 ],
         };
       } else if($mdMedia('sm')) {
         return {
           line: [ 360, 190 ],
-          pie: [ 190, 190 ],
+          pie: [ 205, 190 ],
         };
       } else if($mdMedia('md')) {
         return {
           line: [ 360, 180 ],
-          pie: [ 180, 180 ],
+          pie: [ 360, 180 ],
         };
       } else if($mdMedia('gt-md')) {
         return {
           line: [ 540, 240 ],
-          pie: [ 240, 240 ],
+          pie: [ 450, 240 ],
         };
       }
     };
