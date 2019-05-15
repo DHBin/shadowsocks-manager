@@ -15,6 +15,7 @@ const macAccount = appRequire('plugins/macAccount/index');
 const refOrder = appRequire('plugins/webgui_ref/order');
 const refUser = appRequire('plugins/webgui_ref/user');
 const flowPack = appRequire('plugins/webgui_order/flowPack');
+const accountFlow = appRequire('plugins/account/accountFlow');
 
 exports.getAccount = (req, res) => {
   const group = req.adminInfo.id === 1 ? -1 : req.adminInfo.group;
@@ -40,6 +41,16 @@ exports.getAccount = (req, res) => {
     success.sort((a, b) => {
       return a.port >= b.port ? 1 : -1;
     });
+    res.send(success);
+  }).catch(err => {
+    console.log(err);
+    res.status(403).end();
+  });
+};
+
+exports.getOnlineAccount = (req, res) => {
+  const serverId = req.query.serverId ? +req.query.serverId : 0;
+  account.getOnlineAccount(serverId).then(success => {
     res.send(success);
   }).catch(err => {
     console.log(err);
@@ -87,6 +98,17 @@ exports.getOneAccount = async (req, res) => {
       accountInfo.server = accountInfo.server ? JSON.parse(accountInfo.server) : accountInfo.server;
       accountInfo.data.flowPack = await flowPack.getFlowPack(accountId, accountInfo.data.from, accountInfo.data.to);
     }
+    accountInfo.publicKey = '';
+    accountInfo.privateKey = '';
+    if(accountInfo.key) {
+      if(accountInfo.key.includes(':')) {
+        accountInfo.publicKey = accountInfo.key.split(':')[0];
+        accountInfo.privateKey = accountInfo.key.split(':')[1];
+      } else {
+        accountInfo.publicKey = accountInfo.key;
+      }
+    }
+    await accountFlow.edit(accountInfo.id);
     return res.send(accountInfo);
   } catch(err) {
     console.log(err);
@@ -111,13 +133,15 @@ exports.addAccount = (req, res) => {
       const autoRemoveDelay = +req.body.autoRemoveDelay || 0;
       const multiServerFlow = +req.body.multiServerFlow || 0;
       const server = req.body.server ? JSON.stringify(req.body.server) : null;
+      const user = req.body.user || null;
       return account.addAccount(type, {
         port, password, time, limit, flow, autoRemove, autoRemoveDelay, server, multiServerFlow, orderId,
+        user,
       });
     }
     result.throw();
   }).then(success => {
-    res.send('success');
+    res.send({ id: success });
   }).catch(err => {
     console.log(err);
     res.status(403).end();
@@ -752,6 +776,27 @@ exports.alipayRefund = async (req, res) => {
     const amount = req.body.amount;
     const result = await alipay.refund(orderId, amount);
     res.send(result);
+  } catch(err) {
+    console.log(err);
+    res.status(403).end();
+  }
+};
+
+exports.getAccountAndPaging = async (req, res) => {
+  try {
+    const page = +req.body.page || 1;
+    const pageSize = +req.body.pageSize || 20;
+    const sort = req.body.sort;
+    const search = req.body.search || '';
+    const filter = req.body.filter;
+    const accounts = await account.getAccountAndPaging({
+      page,
+      pageSize,
+      search,
+      sort,
+      filter,
+    });
+    return res.send(accounts);
   } catch(err) {
     console.log(err);
     res.status(403).end();

@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const flowPack = appRequire('plugins/webgui_order/flowPack');
 const alipayPlugin = appRequire('plugins/alipay/index');
 const macAccountPlugin = appRequire('plugins/macAccount/index');
+const accountFlow = appRequire('plugins/account/accountFlow');
 
 const alipay = appRequire('plugins/alipay/index');
 
@@ -23,7 +24,7 @@ exports.getAccount = async (req, res) => {
   try {
     const userId = req.session.user;
     const accounts = await account.getAccount({ userId });
-    for(let account of accounts) {
+    for(const account of accounts) {
       account.data = JSON.parse(account.data);
       if (account.type >= 2 && account.type <= 5) {
         const time = {
@@ -42,6 +43,17 @@ exports.getAccount = async (req, res) => {
         account.data.flowPack = await flowPack.getFlowPack(account.id, account.data.from, account.data.to);
       }
       account.server = account.server ? JSON.parse(account.server) : account.server;
+      account.publicKey = '';
+      account.privateKey = '';
+      if(account.key) {
+        if(account.key.includes(':')) {
+          account.publicKey = account.key.split(':')[0];
+          account.privateKey = account.key.split(':')[1];
+        } else {
+          account.publicKey = account.key;
+        }
+      }
+      await accountFlow.edit(account.id);
     }
     res.send(accounts);
   } catch (err) {
@@ -94,7 +106,7 @@ exports.getServers = (req, res) => {
     });
   };
   let servers;
-  knex('server').select(['id', 'host', 'name', 'method', 'scale', 'comment', 'shift']).orderBy('name')
+  knex('server').select(['id', 'type' ,'host', 'name', 'method', 'scale', 'comment', 'shift', 'key', 'net', 'wgPort']).orderBy('name')
     .then(success => {
       servers = serverAliasFilter(success);
       return account.getAccount({
@@ -298,15 +310,21 @@ exports.getPrice = async (req, res) => {
 exports.getNotice = async (req, res) => {
   try {
     const userId = req.session.user;
-    const groupInfo = await knex('user').select([
-      'group.id as id',
-      'group.showNotice as showNotice',
-    ]).innerJoin('group', 'user.group', 'group.id').where({
-      'user.id': userId,
-    }).then(s => s[0]);
-    const group = [groupInfo.id];
-    if(groupInfo.showNotice) { group.push(-1); }
-    const notices = await knex('notice').select().whereIn('group', group).orderBy('time', 'desc');
+    const noticesWithoutGroup = await knex('notice').where({ group: 0 });
+    const noticesWithGroup = await knex('notice').select([
+      'notice.id as id',
+      'notice.title as title',
+      'notice.content as content',
+      'notice.time as time',
+      'notice.group as group',
+      'notice.autopop as autopop',
+    ])
+    .innerJoin('notice_group', 'notice.id', 'notice_group.noticeId')
+    .innerJoin('user', 'user.group', 'notice_group.groupId')
+    .where('notice.group', '>', 0)
+    .where({ 'user.id': userId })
+    .groupBy('notice.id');
+    const notices = [...noticesWithoutGroup, ...noticesWithGroup ].sort((a, b) => b.time - a.time);
     return res.send(notices);
   } catch (err) {
     console.log(err);
